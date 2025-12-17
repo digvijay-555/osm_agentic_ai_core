@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+requests
+beautifulsoup4
+python-dotenv
+sentence-transformers
+faiss-cpu
+streamlit
+gspread
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+pandas
+lxml
