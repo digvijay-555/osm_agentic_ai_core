@@ -75,10 +75,3 @@ logs/
 
 
 
-# Docker (ignore for now)
-Dockerfile
-Dockerfile.*
-docker-compose.yml
-.dockerignore
-DOCKER_GUIDE.md
-README.md
