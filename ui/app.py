@@ -1,7 +1,7 @@
 import io
 import os
 import time
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import pandas as pd
 import requests
@@ -56,6 +56,22 @@ def get_leads_df() -> pd.DataFrame:
             columns=["uuid", "name", "address", "phone", "website", "email"]
         )
     return pd.DataFrame(leads)
+
+
+def fetch_stats() -> Dict[str, Any]:
+    try:
+        resp = requests.get(
+            f"{get_backend_url().rstrip('/')}/stats",
+            timeout=5,
+        )
+        if not resp.ok:
+            return {}
+        data = resp.json()
+        if isinstance(data, dict):
+            return data
+        return {}
+    except Exception:
+        return {}
 
 
 def ensure_session_state() -> None:
@@ -165,14 +181,14 @@ def main() -> None:
         progress_placeholder = st.empty()
         status_placeholder = st.empty()
 
-        if st.session_state.get("is_running") and st.session_state.get(
-            "run_started_at"
-        ):
-            # Pseudo-progress bar to indicate background work is ongoing.
-            elapsed = time.time() - st.session_state["run_started_at"]
-            # Cap the visual progress at 95% so user understands it might still be running.
-            pct = min(int(elapsed / 2 * 10), 95)  # ~2s per 10%
-            progress_placeholder.progress(pct, text=f"Agent running... {pct}%")
+        stats = fetch_stats()
+        status = stats.get("status") or ("running" if st.session_state.get("is_running") else "idle")
+
+        if status == "running" and st.session_state.get("run_started_at"):
+            # Use pages_processed as a simple proxy for progress (no strict upper bound).
+            pages = int(stats.get("pages_processed") or 0)
+            pct = max(5, min(pages * 10, 95))  # 10% per page, cap at 95%
+            progress_placeholder.progress(pct, text=f"Agent running... ~{pct}%")
 
             # Re-fetch leads to detect growth since run started
             leads_df = get_leads_df()
@@ -181,12 +197,21 @@ def main() -> None:
             new_since_start = max(current_count - baseline, 0)
 
             status_placeholder.info(
-                f"Current total leads: **{current_count}**  ·  "
-                f"New leads since this run started: **{new_since_start}**"
+                f"Status: **{status}**  ·  "
+                f"Pages processed: **{int(stats.get('pages_processed') or 0)}**  ·  "
+                f"New leads this run: **{new_since_start}**"
             )
         else:
-            progress_placeholder.progress(0, text="Agent idle")
+            # Mark run as finished in UI if backend reports done or error.
+            if status in {"done", "error"}:
+                st.session_state["is_running"] = False
+
+            progress_placeholder.progress(
+                100 if status == "done" else 0,
+                text="Agent finished" if status == "done" else "Agent idle",
+            )
             status_placeholder.info(
+                f"Status: **{status}**  ·  "
                 f"Current total leads in Google Sheets: **{total_leads}**"
             )
 

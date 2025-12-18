@@ -1,6 +1,6 @@
 from fastapi import BackgroundTasks, FastAPI
 
-from app.agent.agent import run_agent
+from app.agent.agent import AGENT_STATS, run_agent
 from app.services.sheets import read_all
 
 
@@ -20,4 +20,10 @@ async def get_leads():
     Each record is a dict with keys matching the sheet headers.
     """
     return read_all()
+
+
+@app.get("/stats")
+async def get_stats():
+    """Return in-memory agent statistics for progress tracking."""
+    return AGENT_STATS
 
