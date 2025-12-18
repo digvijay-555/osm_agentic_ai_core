@@ -169,7 +169,8 @@ osm-agentic-ai/
 │   │
 │   ├── tools/                   # External tool integrations
 │   │   ├── __init__.py
-│   │   ├── nominatim.py         # OSM Nominatim geocoding
+│   │   ├── overpass.py          # OSM Overpass-based place search
+│   │   ├── nominatim.py         # Backward-compat shim importing from overpass
 │   │   ├── scraper.py           # Web scraping utilities
 │   │   └── email.py             # Email extraction
 │   │

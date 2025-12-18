@@ -71,5 +71,5 @@ secrets/
 *.log
 logs/
 
-
-
+# Internal design/documentation notes (not for git)
+DESIGN_NOTES_INTERNAL.md

@@ -1,4 +1,4 @@
-from app.tools.nominatim import search
+from app.tools.overpass import search
 from app.agent.planner import enrich_lead
 from app.memory.vector_store import is_duplicate
 from app.services.sheets import append_row

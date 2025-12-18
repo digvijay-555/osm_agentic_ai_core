@@ -1,23 +1,9 @@
-# Nominatim geocoding tool
+"""
+Backward-compat shim for code that still imports `app.tools.nominatim`.
 
-import requests
-import os
-from dotenv import load_dotenv
+The actual implementation now lives in `app.tools.overpass`.
+"""
 
-load_dotenv()
+from app.tools.overpass import search  # noqa: F401
 
-HEADERS = {"User-Agent": os.getenv("USER_AGENT")}
 
-def search(query, limit=10, offset=0):
-    return requests.get(
-        "https://nominatim.openstreetmap.org/search",
-        params={
-            "q": query,
-            "format": "json",
-            "limit": limit,
-            "offset": offset,
-            "addressdetails": 1,
-            "extratags": 1
-        },
-        headers=HEADERS
-    ).json()
