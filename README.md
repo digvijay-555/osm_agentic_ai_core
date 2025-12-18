@@ -24,7 +24,7 @@ A production-grade intelligent agent system that automatically discovers, enrich
 
 OSM Agentic AI is an autonomous agent system that:
 
-1. **Searches** for businesses using OpenStreetMap's Nominatim geocoding API
+1. **Searches** for businesses using OpenStreetMap's Overpass API (via Overpass QL)
 2. **Enriches** raw business data using Large Language Models (LLM) via Ollama
 3. **Deduplicates** leads using vector similarity search (FAISS + Sentence Transformers)
 4. **Stores** cleaned and normalized data in Google Sheets
@@ -57,7 +57,7 @@ The system consists of:
 ┌─────────────────────────────────────────────────┐
 │           Agent Processing Pipeline              │
 ├─────────────────────────────────────────────────┤
-│  1. Nominatim Search → Raw Business Data        │
+│  1. Overpass Search → Raw Business Data         │
 │  2. LLM Enrichment → Cleaned & Normalized       │
 │  3. Vector Similarity → Duplicate Detection     │
 │  4. Google Sheets → Persistent Storage          │
@@ -89,7 +89,7 @@ The system consists of:
 │                    Service Layer                             │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
 │  │   Tools      │  │   Memory     │  │  Services    │     │
-│  │ - Nominatim  │  │ - Vector DB  │  │ - Sheets     │     │
+│  │ - Overpass   │  │ - Vector DB  │  │ - Sheets     │     │
 │  │ - Scraper    │  │ - FAISS      │  │ - UUID       │     │
 │  │ - Email      │  │              │  │              │     │
 │  └──────────────┘  └──────────────┘  └──────────────┘     │
@@ -98,8 +98,8 @@ The system consists of:
 ┌──────────────▼───────────────────────────▼──────────────────┐
 │                  External Integrations                       │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
-│  │   Ollama     │  │  Nominatim   │  │ Google Sheets│     │
-│  │   LLM API    │  │  Geocoding   │  │     API      │     │
+│  │   Ollama     │  │  Overpass    │  │ Google Sheets│     │
+│  │   LLM API    │  │  OSM Search  │  │     API      │     │
 │  └──────────────┘  └──────────────┘  └──────────────┘     │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -108,7 +108,7 @@ The system consists of:
 
 1. **User Input** → Streamlit UI receives search query
 2. **API Request** → FastAPI endpoint triggers agent in background
-3. **Search Phase** → Nominatim returns paginated business results
+3. **Search Phase** → Overpass returns raw OSM business objects
 4. **Enrichment Phase** → Each raw result is sent to LLM for cleaning
 5. **Deduplication** → Vector similarity check against existing leads
 6. **Storage** → Valid leads appended to Google Sheets with UUID
@@ -213,7 +213,7 @@ osm-agentic-ai/
 
 ## ✨ Features
 
-- 🔍 **Intelligent Search**: Leverages OpenStreetMap's Nominatim for comprehensive business discovery
+- 🔍 **Intelligent Search**: Leverages OpenStreetMap's Overpass API for flexible, structured business discovery
 - 🤖 **AI-Powered Enrichment**: Uses LLM to clean, normalize, and structure raw business data
 - 🔄 **Smart Deduplication**: Vector similarity search prevents duplicate entries
 - 📊 **Google Sheets Integration**: Automatic storage with structured data format
@@ -288,8 +288,8 @@ Create a `.env` file in the root directory:
 OLLAMA_MODEL=llama2  # or your preferred model
 OLLAMA_BASE_URL=http://localhost:11434
 
-# Nominatim Configuration
-USER_AGENT=YourAppName/1.0  # Required for Nominatim API
+# Overpass / OSM Configuration
+USER_AGENT=YourAppName/1.0  # Required user-agent for OSM APIs
 
 # Google Sheets (already configured in sheets.py)
 # SPREADSHEET_ID=your_sheet_id_here
@@ -444,7 +444,7 @@ FastAPI provides interactive API documentation:
 |----------|-------------|---------|----------|
 | `OLLAMA_MODEL` | Ollama model name | `llama2` | Yes |
 | `OLLAMA_BASE_URL` | Ollama server URL | `http://localhost:11434` | No |
-| `USER_AGENT` | Nominatim user agent | - | Yes |
+| `USER_AGENT` | OSM/Overpass user agent | - | Yes |
 | `SPREADSHEET_ID` | Google Sheet ID | Set in code | Yes |
 
 ### Google Sheets Configuration
@@ -578,7 +578,7 @@ curl http://localhost:11434/api/tags
 
 - **Vector Store**: In-memory FAISS index (resets on restart)
 - **LLM Calls**: Sequential processing (consider batching for scale)
-- **Nominatim Rate Limits**: Respect API rate limits (1 req/sec recommended)
+- **Overpass Usage**: Be a good citizen; avoid overly aggressive, repetitive queries
 - **Google Sheets**: Batch writes for better performance
 
 ---

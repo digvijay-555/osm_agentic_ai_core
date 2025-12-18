@@ -110,7 +110,7 @@ def main() -> None:
         st.markdown("---")
         st.subheader("ℹ️ How it works")
         st.markdown(
-            "- Uses **Nominatim (OSM)** to search for businesses\n"
+            "- Uses **Overpass (OSM)** to search for businesses\n"
             "- Cleans & normalizes data via **LLM (Ollama)**\n"
             "- Detects duplicates using **FAISS + embeddings**\n"
             "- Appends final leads into **Google Sheets**"
@@ -302,7 +302,7 @@ def main() -> None:
         st.markdown("### 💡 Tips")
         st.markdown(
             "- Start with **narrow, location-specific queries**\n"
-            "- Avoid hammering Nominatim with many rapid runs\n"
+            "- Avoid hammering Overpass with many rapid runs\n"
             "- Keep your Google Sheet open to watch new rows appear in real‑time"
         )
 
