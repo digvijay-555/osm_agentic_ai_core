@@ -50,9 +50,9 @@ credentials.json
 service-account*.json
 *.json.key
 
-# Test files
-test_*.py
-*_test.py
+# Ignore test output only
+*.test.log
+
 
 # Secrets and keys
 *.key
