@@ -106,12 +106,16 @@ The system consists of:
 
 ### Data Flow
 
-1. **User Input** → Streamlit UI receives search query
+1. **User Input** → Streamlit UI receives search query (e.g., "cafe in berlin")
 2. **API Request** → FastAPI endpoint triggers agent in background
-3. **Search Phase** → Overpass returns raw OSM business objects
-4. **Enrichment Phase** → Each raw result is sent to LLM for cleaning
-5. **Deduplication** → Vector similarity check against existing leads
+3. **Search Phase** → Overpass API returns raw OSM business objects (area-based search)
+4. **Enrichment Phase** → Each raw result is:
+   - Extracted from OSM tags (name, address, phone, website, email)
+   - Optionally cleaned by LLM
+   - Email scraped from website if missing
+5. **Deduplication** → Vector similarity check (FAISS) against existing leads
 6. **Storage** → Valid leads appended to Google Sheets with UUID
+7. **Progress Tracking** → Real-time stats available via `/stats` endpoint
 
 ---
 
@@ -213,14 +217,17 @@ osm-agentic-ai/
 
 ## ✨ Features
 
-- 🔍 **Intelligent Search**: Leverages OpenStreetMap's Overpass API for flexible, structured business discovery
+- 🔍 **Intelligent Search**: Leverages OpenStreetMap's Overpass API with smart "X in Y" query parsing (e.g., "cafe in berlin")
 - 🤖 **AI-Powered Enrichment**: Uses LLM to clean, normalize, and structure raw business data
-- 🔄 **Smart Deduplication**: Vector similarity search prevents duplicate entries
+- 📧 **Email Scraping**: Automatically extracts email addresses from business websites when missing from OSM data
+- 🔄 **Smart Deduplication**: Vector similarity search (FAISS) prevents duplicate entries using semantic matching
 - 📊 **Google Sheets Integration**: Automatic storage with structured data format
+- 📈 **Real-Time Progress Tracking**: Live progress updates, metrics, and statistics in the UI
 - 🐳 **Dockerized**: Fully containerized for easy deployment
-- 🎨 **Modern UI**: Streamlit-based interactive interface
+- 🎨 **Modern UI**: Streamlit-based interactive interface with live results table and export options
 - ⚡ **Async Processing**: Background task execution for non-blocking operations
 - 🔐 **Secure**: Environment-based configuration and credential management
+- ✅ **Flexible Validation**: Only business name required; email, phone, and address are optional
 
 ---
 
@@ -289,7 +296,8 @@ OLLAMA_MODEL=llama2  # or your preferred model
 OLLAMA_BASE_URL=http://localhost:11434
 
 # Overpass / OSM Configuration
-USER_AGENT=YourAppName/1.0  # Required user-agent for OSM APIs
+USER_AGENT=YourAppName/1.0 (your_email@example.com)  # Required for Overpass API
+OVERPASS_URL=https://overpass-api.de/api/interpreter  # Optional, uses default if not set
 
 # Google Sheets (already configured in sheets.py)
 # SPREADSHEET_ID=your_sheet_id_here
@@ -393,10 +401,19 @@ Both services include health checks and automatic restart policies.
 ### Using the Streamlit UI
 
 1. Open http://localhost:8501
-2. Enter a business search query (e.g., "restaurants in New York")
-3. Click "Run Agent"
-4. Monitor the background processing
-5. Check your Google Sheet for results
+2. Enter a business search query using "X in Y" pattern:
+   - `"cafe in berlin"`
+   - `"dentist in london"`
+   - `"restaurant in paris"`
+   - Or simple name search: `"Starbucks"`
+3. Click "🚀 Run Agent"
+4. **Monitor progress in real-time:**
+   - Live progress bar showing agent status
+   - Metrics: Total leads, unique emails, duplicates skipped
+   - Results table updates automatically
+   - Deduplication statistics
+5. Check your Google Sheet for results (or view in the UI results table)
+6. Export data: Download CSV or JSON from the UI
 
 ### Using the API Directly
 
@@ -411,14 +428,14 @@ curl -X POST "http://localhost:8000/run?query=coffee shops in San Francisco"
 ### API Endpoints
 
 #### `POST /run`
-Triggers the agent to process a search query.
+Triggers the agent to process a search query in the background.
 
 **Parameters:**
-- `query` (query string): Business search query
+- `query` (query string): Business search query (supports "X in Y" pattern)
 
 **Example:**
 ```bash
-curl -X POST "http://localhost:8000/run?query=dentists in Los Angeles"
+curl -X POST "http://localhost:8000/run?query=cafe%20in%20berlin"
 ```
 
 **Response:**
@@ -426,6 +443,63 @@ curl -X POST "http://localhost:8000/run?query=dentists in Los Angeles"
 {
   "status": "Agent started"
 }
+```
+
+**Note:** The agent runs asynchronously. Use `/stats` endpoint to track progress.
+
+---
+
+#### `GET /stats`
+Returns real-time agent statistics and progress information.
+
+**Example:**
+```bash
+curl -X GET "http://localhost:8000/stats"
+```
+
+**Response:**
+```json
+{
+  "status": "running",
+  "last_query": "cafe in berlin",
+  "started_at": 1766082204.140619,
+  "finished_at": null,
+  "pages_processed": 1,
+  "leads_written": 15,
+  "skipped_duplicates": 3,
+  "errors": 0
+}
+```
+
+**Status values:**
+- `idle` - Agent not running
+- `running` - Agent currently processing
+- `done` - Agent completed successfully
+- `error` - Agent encountered an error
+
+---
+
+#### `GET /leads`
+Returns all leads currently stored in Google Sheets.
+
+**Example:**
+```bash
+curl -X GET "http://localhost:8000/leads"
+```
+
+**Response:**
+```json
+[
+  {
+    "uuid": "a1b2c3d4-...",
+    "name": "Café Central",
+    "address": "1 Unter den Linden, Berlin",
+    "phone": "+49 30 12345678",
+    "website": "https://cafe-central.de",
+    "email": "info@cafe-central.de"
+  },
+  ...
+]
 ```
 
 ### View API Documentation
@@ -445,6 +519,7 @@ FastAPI provides interactive API documentation:
 | `OLLAMA_MODEL` | Ollama model name | `llama2` | Yes |
 | `OLLAMA_BASE_URL` | Ollama server URL | `http://localhost:11434` | No |
 | `USER_AGENT` | OSM/Overpass user agent | - | Yes |
+| `OVERPASS_URL` | Overpass API endpoint | `https://overpass-api.de/api/interpreter` | No |
 | `SPREADSHEET_ID` | Google Sheet ID | Set in code | Yes |
 
 ### Google Sheets Configuration
@@ -527,7 +602,29 @@ Error: FileNotFoundError: credentials.json
 - Verify service account has Sheet access
 - Check file permissions
 
-#### 3. Import Errors
+#### 3. Overpass API Returns 0 Results
+```
+Overpass returned 0 results
+```
+**Solution**:
+- Check query format: Use "X in Y" pattern (e.g., "cafe in berlin")
+- Verify location name is correct (case-insensitive)
+- Try simpler query: "Starbucks" (name-based search)
+- Check Overpass API status: https://overpass-api.de/api/status
+- Review terminal logs for Overpass query details
+
+#### 4. Agent Runs But No Leads Written to Sheet
+```
+leads_written: 0
+```
+**Solution**:
+- Check terminal logs for specific errors
+- Verify Google Sheets credentials and permissions
+- Ensure sheet has correct headers (UUID, Name, Address, Phone, Website, Email)
+- Check if leads are being skipped as duplicates
+- Verify business names are present (required field)
+
+#### 5. Import Errors
 ```
 ModuleNotFoundError: No module named 'app'
 ```
@@ -535,14 +632,15 @@ ModuleNotFoundError: No module named 'app'
 - Ensure you're running from project root
 - Verify `__init__.py` files exist in all packages
 - Use absolute imports: `from app.module import ...`
+- Check Python path and virtual environment activation
 
-#### 4. Vector Store Memory Issues
+#### 6. Vector Store Memory Issues
 ```
 Error: FAISS index not initialized
 ```
 **Solution**: The vector store initializes on first use. Ensure `sentence-transformers` is installed.
 
-#### 5. Docker Build Fails
+#### 7. Docker Build Fails
 ```
 Error: Failed to build Docker image
 ```
@@ -613,12 +711,14 @@ curl http://localhost:11434/api/tags
 
 ## 🎯 Roadmap
 
+- [x] Real-time progress tracking ✅
+- [x] Email scraping from websites ✅
+- [x] Smart query parsing ("X in Y" patterns) ✅
 - [ ] Persistent vector store (Redis/PostgreSQL)
 - [ ] Batch processing optimization
-- [ ] Real-time progress tracking
 - [ ] Advanced filtering and search
 - [ ] Multi-language support
-- [ ] Export to multiple formats (CSV, JSON, etc.)
+- [ ] Export to multiple formats (CSV, JSON, etc.) - CSV/JSON export already available in UI
 
 ---
 
