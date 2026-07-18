@@ -1,18 +1,25 @@
 # Ollama LLM client
 
-import requests
 import os
+
+import requests
 from dotenv import load_dotenv
 
 load_dotenv()
 
-def call_llm(prompt):
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
+
+
+def call_llm(prompt: str) -> str:
     response = requests.post(
-        "http://localhost:11434/api/generate",
+        f"{OLLAMA_BASE_URL}/api/generate",
         json={
-            "model": os.getenv("OLLAMA_MODEL"),
+            "model": OLLAMA_MODEL,
             "prompt": prompt,
-            "stream": False
-        }
+            "stream": False,
+        },
+        timeout=120,
     )
+    response.raise_for_status()
     return response.json()["response"]
