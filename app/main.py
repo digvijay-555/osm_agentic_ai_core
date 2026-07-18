@@ -1,10 +1,18 @@
+from contextlib import asynccontextmanager
+
 from fastapi import BackgroundTasks, FastAPI
 
 from app.agent.agent import AGENT_STATS, run_agent
-from app.services.sheets import read_all
+from app.db.sqlite import count_leads, get_all_leads, init_db
 
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.post("/run")
@@ -16,10 +24,14 @@ async def run(query: str, bg: BackgroundTasks):
 @app.get("/leads")
 async def get_leads():
     """
-    Return all leads currently stored in Google Sheets.
-    Each record is a dict with keys matching the sheet headers.
+    Return all leads stored in SQLite (source of truth).
     """
-    return read_all()
+    return get_all_leads()
+
+
+@app.get("/leads/count")
+async def get_leads_count():
+    return {"count": count_leads()}
 
 
 @app.get("/stats")
