@@ -71,6 +71,12 @@ secrets/
 *.log
 logs/
 
+# Local SQLite database
+data/
+
+# Level upgrade plans (local progress notes)
+plan/
+
 # Internal design/documentation notes (not for git)
 DESIGN_NOTES_INTERNAL.md
 CODE_EXPLANATION.md
