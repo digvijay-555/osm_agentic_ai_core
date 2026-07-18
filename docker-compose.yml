@@ -13,6 +13,7 @@ services:
     volumes:
       - ./credentials.json:/app/credentials.json:ro
       - ./app:/app/app
+      - ./data:/app/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "python -c 'import socket; s=socket.socket(); s.connect((\"localhost\", 8000)); s.close()' || exit 1"]
