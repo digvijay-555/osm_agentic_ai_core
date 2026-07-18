@@ -1,12 +1,15 @@
 
-from app.tools.overpass import search
-from app.agent.planner import enrich_lead
-from app.memory.vector_store import is_duplicate
-from app.services.sheets import append_row
-from app.tools.scraper import fetch_text
-from app.tools.email import extract as extract_email
 import time
 import uuid
+
+from app.agent.planner import enrich_lead
+from app.db.sqlite import insert_lead
+from app.memory.vector_store import is_duplicate
+from app.models.lead import Lead
+from app.services.sheets import append_row, sheets_export_enabled
+from app.tools.email import extract as extract_email
+from app.tools.overpass import search
+from app.tools.scraper import fetch_text
 
 AGENT_STATS = {
     "status": "idle",
@@ -97,26 +100,37 @@ def run_agent(query: str):
                     print(f"  🔄 Duplicate detected, skipping")
                     continue
                 
-                # Prepare row for Google Sheets - empty strings are fine for optional fields
-                row = [
-                    str(uuid.uuid4()),
-                    enriched.get("name", "").strip(),
-                    enriched.get("address", "").strip() or "",  # Empty string if missing
-                    enriched.get("phone", "").strip() or "",    # Empty string if missing
-                    enriched.get("website", "").strip() or "",  # Empty string if missing
-                    enriched.get("email", "").strip() or "",    # Empty string if missing
-                ]
-                
-                # Write to Google Sheets - will write even if email/phone/address are empty
+                # Prepare lead — SQLite is source of truth
+                lead_id = str(uuid.uuid4())
+                lead = Lead(
+                    uuid=lead_id,
+                    name=enriched.get("name", "").strip(),
+                    address=enriched.get("address", "").strip() or "",
+                    phone=enriched.get("phone", "").strip() or "",
+                    website=enriched.get("website", "").strip() or "",
+                    email=enriched.get("email", "").strip() or "",
+                    query=query,
+                )
+
                 try:
-                    append_row(row)
+                    insert_lead(**lead.to_dict())
                     AGENT_STATS["leads_written"] += 1
-                    print(f"  ✅ Lead written to Sheets (#{AGENT_STATS['leads_written']})")
-                    print(f"     Name: {row[1]}, Address: {row[2] or 'N/A'}, Phone: {row[3] or 'N/A'}, Email: {row[5] or 'N/A'}")
+                    print(f"  ✅ Lead saved to SQLite (#{AGENT_STATS['leads_written']})")
+                    print(
+                        f"     Name: {lead.name}, Address: {lead.address or 'N/A'}, "
+                        f"Phone: {lead.phone or 'N/A'}, Email: {lead.email or 'N/A'}"
+                    )
+
+                    if sheets_export_enabled():
+                        try:
+                            append_row(lead.to_row())
+                            print("  📊 Also exported to Google Sheets")
+                        except Exception as sheet_err:
+                            print(f"  ⚠️ Sheets export failed (SQLite saved): {sheet_err}")
+                            AGENT_STATS["errors"] += 1
                 except Exception as write_err:
-                    print(f"  ❌ Failed to write to Sheets: {write_err}")
+                    print(f"  ❌ Failed to save lead to SQLite: {write_err}")
                     AGENT_STATS["errors"] += 1
-                    # Don't re-raise - continue with next lead
                 
             except Exception as lead_err:
                 print(f"❌ Error processing lead {idx+1}: {lead_err}")
