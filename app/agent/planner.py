@@ -7,7 +7,7 @@ from typing import Dict, Optional
 from app.llm.ollama_client import call_llm
 from app.agent.prompt import SYSTEM_PROMPT
 
-def enrich_lead(raw: Dict) -> Optional[Dict]:
+async def enrich_lead(raw: Dict) -> Optional[Dict]:
     tags = raw.get("tags", {})
     
     base_lead = {
@@ -29,7 +29,7 @@ def enrich_lead(raw: Dict) -> Optional[Dict]:
     # LLM enrichment (optional)
     prompt = SYSTEM_PROMPT + "\nRAW DATA:\n" + json.dumps(raw, indent=2)
     try:
-        llm_response = call_llm(prompt)
+        llm_response = await call_llm(prompt)
         if llm_response:
             parsed = json.loads(llm_response)
             for key in base_lead:
