@@ -144,7 +144,7 @@ def main() -> None:
             st.session_state["is_running"] = False
             st.session_state["run_started_at"] = None
             st.session_state["baseline_count"] = None
-            st.experimental_rerun()
+            st.rerun()
 
         # Initial data load for metrics and table
         leads_df = get_leads_df()
