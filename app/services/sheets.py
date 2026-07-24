@@ -45,7 +45,7 @@ def append_row(row):
         print(f"✅ Successfully appended row to Google Sheets: {row[1] if len(row) > 1 else 'N/A'}")
         return True
     except Exception as e:
-        print(f"❌ Error appending row to Google Sheets: {e}")
+        print(f" Error appending row to Google Sheets: {e}")
         print(f"   Row data: {row}")
         raise
 
@@ -54,5 +54,5 @@ def read_all():
         sheet = get_sheet()
         return sheet.get_all_records()
     except Exception as e:
-        print(f"❌ Error reading from Google Sheets: {e}")
+        print(f" Error reading from Google Sheets: {e}")
         return []
