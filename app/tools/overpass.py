@@ -89,7 +89,7 @@ def _build_overpass_query(query: str, limit: int) -> str:
         location_safe = parsed["location"].replace('"', r'\"')
         
         return f"""
-        [out:json][timeout:60];
+        [out:json][timeout:120];
         (
           // First, find the area (city/region) by name
           area["name"~"{location_safe}", i]["admin_level"~"[2-8]"]->.searchArea;
@@ -106,7 +106,7 @@ def _build_overpass_query(query: str, limit: int) -> str:
     # Fallback: name-based search (works for queries like "Starbucks" or "McDonald's")
     safe = query.replace('"', r'\"')
     return f"""
-    [out:json][timeout:60];
+    [out:json][timeout:120];
     (
       node["name"~"{safe}", i];
       way["name"~"{safe}", i];
@@ -115,15 +115,21 @@ def _build_overpass_query(query: str, limit: int) -> str:
     out center {limit};
     """
 
+_query_cache = {}
+
 async def search(query: str, limit: int = 50, retries: int = 3):
-    """Search OSM via Overpass API with retry logic."""
+    """Search OSM via Overpass API with retry logic and caching."""
+    if query in _query_cache:
+        print(f"⚡ Returning cached results for query: {query}")
+        return _query_cache[query]
+
     query_str = _build_overpass_query(query, limit)
     payload = {"data": query_str}
     
     # Debug: print the query (first 200 chars)
     print(f"🔍 Overpass query: {query_str[:200]}...")
     
-    async with httpx.AsyncClient(timeout=90.0) as client:
+    async with httpx.AsyncClient(timeout=130.0) as client:
         for attempt in range(retries):
             try:
                 resp = await client.post(OVERPASS_URL, data=payload, headers=HEADERS)
@@ -135,17 +141,27 @@ async def search(query: str, limit: int = 50, retries: int = 3):
                 if "remark" in data:
                     print(f"⚠️ Overpass remark: {data['remark']}")
                 
+                _query_cache[query] = elements
                 return elements
-            except httpx.RequestError as e:
+            except httpx.HTTPError as e:
                 print(f"❌ Overpass attempt {attempt+1} failed: {e}")
                 if attempt < retries - 1:
                     wait_time = 2 ** attempt
-                    print(f"⏳ Retrying in {wait_time} seconds...")
+                    if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 429:
+                        wait_time = 15 * (attempt + 1)  # Longer backoff for rate limits
+                        print(f"🐢 Rate limited (429)! Retrying in {wait_time} seconds...")
+                    else:
+                        print(f"⏳ Retrying in {wait_time} seconds...")
+                    
                     await asyncio.sleep(wait_time)
                     continue
+                
                 # On final failure, try a simpler query as fallback
                 print("⚠️ Trying fallback name-based search...")
-                return await _fallback_search(query, limit)
+                fallback_results = await _fallback_search(query, limit)
+                if fallback_results:
+                    _query_cache[query] = fallback_results
+                return fallback_results
     return []
 
 async def _fallback_search(query: str, limit: int) -> list:
