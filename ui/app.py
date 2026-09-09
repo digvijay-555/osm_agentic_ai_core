@@ -53,7 +53,10 @@ def get_leads_df() -> pd.DataFrame:
     leads = fetch_leads()
     if not leads:
         return pd.DataFrame(
-            columns=["uuid", "name", "address", "phone", "website", "email"]
+            columns=[
+                "uuid", "name", "address", "phone", "website", "email",
+                "lat", "lon", "query", "created_at"
+            ]
         )
     return pd.DataFrame(leads)
 
@@ -222,7 +225,10 @@ def main() -> None:
             st.warning("No leads found yet. Run the agent to start collecting data.")
         else:
             # Ensure standard column order if these fields exist
-            preferred_cols = ["uuid", "name", "address", "phone", "website", "email"]
+            preferred_cols = [
+                "uuid", "name", "address", "phone", "website", "email",
+                "lat", "lon", "query", "created_at"
+            ]
             cols = [c for c in preferred_cols if c in leads_df.columns] + [
                 c for c in leads_df.columns if c not in preferred_cols
             ]
