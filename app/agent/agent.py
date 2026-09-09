@@ -51,8 +51,10 @@ async def process_lead(idx, raw, query, location_filter, sem, filtered_count_ref
             
             # Try to scrape email from website if missing (optional - won't skip if fails)
             if (not enriched.get("email")) or enriched.get("email") in {"N/A", "na", "none", "null", ""}:
-                website = enriched.get("website") or ""
-                if website.startswith("http"):
+                website = (enriched.get("website") or "").strip()
+                if website:
+                    if not website.startswith(("http://", "https://")):
+                        website = f"https://{website}"
                     try:
                         html_text = await fetch_text(website)
                         scraped_email = extract_email(html_text)
@@ -78,6 +80,8 @@ async def process_lead(idx, raw, query, location_filter, sem, filtered_count_ref
                 phone=enriched.get("phone", "").strip() or "",
                 website=enriched.get("website", "").strip() or "",
                 email=enriched.get("email", "").strip() or "",
+                lat=enriched.get("lat"),
+                lon=enriched.get("lon"),
                 query=query,
             )
 
